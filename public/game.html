@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PokerBros</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Table column ──────────────────────────────────────────────── -->
+  <div id="table-area">
+
+    <div id="header">
+      <span class="logo">♠ PokerBros</span>
+      <span class="room-badge" id="room-badge"></span>
+      <div class="header-right">
+        <button class="hbtn" id="mute-btn" title="Toggle sound" onclick="toggleMute()">🔊</button>
+        <button class="hbtn" id="settings-btn" title="Settings" onclick="openSettings()">⚙ Settings</button>
+        <button class="hbtn" onclick="shareLink()">Copy Link</button>
+        <button class="hbtn danger" onclick="leaveGame()">Leave</button>
+      </div>
+    </div>
+
+    <!-- Poker table -->
+    <div id="poker-table">
+      <div id="center-area">
+        <div class="street-label" id="street-label"></div>
+        <div id="community-cards"></div>
+        <div id="pot-area" style="display:none">
+          <span class="pot-chip">🟡</span>
+          <span id="pot-value">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bomb pot banner -->
+    <div id="bomb-banner">💣 BOMB POT</div>
+
+    <!-- Hero cards bar -->
+    <div id="hero-cards"></div>
+
+    <!-- Rabbit hunting strip -->
+    <div id="rabbit-strip">
+      <span class="rabbit-label">🐇 Rabbit</span>
+    </div>
+
+    <!-- Waiting overlay -->
+    <div id="waiting-overlay">
+      <h2 id="waiting-title">Waiting for players…</h2>
+      <p id="waiting-sub"></p>
+      <button id="start-game-btn" onclick="emitStart()">Deal Cards</button>
+    </div>
+
+    <!-- Winner banner -->
+    <div id="winner-banner">
+      <div class="wb-label">Winner</div>
+      <div class="wb-name" id="wb-name"></div>
+      <div class="wb-hand" id="wb-hand"></div>
+      <div class="wb-amt"  id="wb-amt"></div>
+    </div>
+
+    <!-- Action bar -->
+    <div id="action-area" class="hidden">
+      <span id="action-info"></span>
+      <button class="act-btn btn-fold"  onclick="act('fold')">Fold</button>
+      <button class="act-btn btn-check" id="btn-check" onclick="act('check')">Check</button>
+      <button class="act-btn btn-call"  id="btn-call"  onclick="act('call')">Call 0</button>
+      <div class="raise-area">
+        <input type="number" id="raise-val" min="0" step="1">
+        <input type="range"  id="raise-slider" min="0" max="1000" step="1">
+        <button class="act-btn btn-raise" onclick="act('raise')">Raise</button>
+      </div>
+      <div class="quick-btns">
+        <button class="qbtn" onclick="quickRaise('half')">½ Pot</button>
+        <button class="qbtn" onclick="quickRaise('pot')">Pot</button>
+        <button class="qbtn" onclick="quickRaise('2x')">2×</button>
+        <button class="qbtn" onclick="quickRaise('max')">Max</button>
+      </div>
+      <button class="act-btn btn-allin" onclick="act('allin')">All-In</button>
+    </div>
+
+  </div><!-- /table-area -->
+
+  <!-- ── Sidebar ────────────────────────────────────────────────────── -->
+  <div id="sidebar">
+    <div class="tabs">
+      <div class="tab active" data-tab="log"  onclick="switchTab('log')">Log</div>
+      <div class="tab"        data-tab="chat" onclick="switchTab('chat')">Chat</div>
+      <div class="tab"        data-tab="host" id="host-tab" onclick="switchTab('host')" style="display:none">Host</div>
+    </div>
+
+    <div class="tab-panel active" id="tab-log">
+      <div id="log-panel"></div>
+    </div>
+
+    <div class="tab-panel" id="tab-chat">
+      <div id="chat-messages"></div>
+      <form id="chat-form" onsubmit="sendChat(event)">
+        <input id="chat-input" type="text" placeholder="Message…" maxlength="200" autocomplete="off">
+        <button type="submit" id="chat-send">Send</button>
+      </form>
+    </div>
+
+    <div class="tab-panel" id="tab-host">
+      <div id="host-panel">
+        <div class="host-sec">
+          <h3>Game Controls</h3>
+          <div class="h-row">
+            <button class="h-btn primary" onclick="emitNext()">Deal Next Hand</button>
+            <button class="h-btn red-btn" onclick="confirmEnd()">End Hand</button>
+          </div>
+          <div class="h-row">
+            <button class="h-btn" id="bomb-pot-btn" onclick="triggerBombPot()">💣 Bomb Pot Next</button>
+          </div>
+        </div>
+        <div class="host-sec">
+          <h3>Quick Settings</h3>
+          <div class="h-row">
+            <input class="h-input" id="sb-in" type="number" placeholder="SB" min="1">
+            <input class="h-input" id="bb-in" type="number" placeholder="BB" min="2">
+            <button class="h-btn" onclick="setBlindsDirect()">Set Blinds</button>
+          </div>
+          <div class="h-row">
+            <button class="h-btn" style="flex:1" onclick="openSettings()">⚙ Full Settings</button>
+          </div>
+        </div>
+        <div class="host-sec">
+          <h3>Players</h3>
+          <div id="host-players"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ══════════════════════════════════════════════════════════════
+     SETTINGS MODAL
+══════════════════════════════════════════════════════════════ -->
+<div id="settings-overlay" onclick="overlayClick(event)">
+  <div id="settings-dialog">
+
+    <div class="sdlg-header">
+      <h2>Table Settings</h2>
+      <span class="sdlg-room" id="sdlg-room"></span>
+      <button class="sdlg-close" onclick="closeSettings()">✕</button>
+    </div>
+
+    <div class="sdlg-tabs">
+      <div class="sdlg-tab active" data-stab="game"    onclick="settingsTab('game')">Game Rules</div>
+      <div class="sdlg-tab"        data-stab="timing"  onclick="settingsTab('timing')">Timing</div>
+      <div class="sdlg-tab"        data-stab="prefs"   onclick="settingsTab('prefs')">Preferences</div>
+      <div class="sdlg-tab"        data-stab="players" onclick="settingsTab('players')">Players</div>
+    </div>
+
+    <div class="sdlg-body">
+
+      <!-- ── Game Rules ───────────────────────────────────────────── -->
+      <div class="sdlg-panel active" id="stab-game">
+        <div class="sdlg-cols">
+
+          <div>
+            <div class="sset-section">
+              <div class="sset-title">Blinds &amp; Structure</div>
+              <div class="sset-row">
+                <span class="sset-label">Small Blind</span>
+                <div class="sset-control">
+                  <input class="sset-num" type="number" id="s-sb" min="1" value="10">
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Big Blind</span>
+                <div class="sset-control">
+                  <input class="sset-num" type="number" id="s-bb" min="2" value="20">
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Ante
+                  <small>Posted by every player each hand</small>
+                </span>
+                <div class="sset-control" style="gap:8px">
+                  <input class="sset-num sset-num-sm" type="number" id="s-ante-amt" min="0" value="0">
+                  <label class="toggle"><input type="checkbox" id="s-ante"><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">UTG Straddle
+                  <small>UTG posts 2× BB, acts last pre-flop</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-straddle"><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Starting Chips</span>
+                <div class="sset-control">
+                  <input class="sset-num sset-num-lg" type="number" id="s-chips" min="1" value="1000">
+                </div>
+              </div>
+            </div>
+
+            <div class="sset-section">
+              <div class="sset-title">Special Rules</div>
+              <div class="sset-row">
+                <span class="sset-label">Run It Twice
+                  <small>When all-in, deal 2 boards (coming soon)</small>
+                </span>
+                <div class="sset-control">
+                  <div class="radio-group">
+                    <button class="radio-opt" data-group="rit" data-val="always" onclick="radioSelect(this)">Always</button>
+                    <button class="radio-opt" data-group="rit" data-val="ask"    onclick="radioSelect(this)">Ask</button>
+                    <button class="radio-opt active" data-group="rit" data-val="no" onclick="radioSelect(this)">No</button>
+                  </div>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Rabbit Hunting
+                  <small>Show undealt cards after uncontested pot</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-rabbit"><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Bomb Pots
+                  <small>Everyone posts forced bet, start at flop</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-bombpot"><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row" id="bomb-amt-row" style="display:none">
+                <span class="sset-label">Bomb Pot Amount
+                  <small>0 = auto (2× BB per player)</small>
+                </span>
+                <div class="sset-control">
+                  <input class="sset-num sset-num-lg" type="number" id="s-bomb-amt" min="0" value="0">
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">7-2 Bounty
+                  <small>Chips paid per player when 7-2 wins (0 = off)</small>
+                </span>
+                <div class="sset-control">
+                  <input class="sset-num" type="number" id="s-bounty72" min="0" value="0">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="sset-section">
+              <div class="sset-title">Table Management</div>
+              <div class="sset-row">
+                <span class="sset-label">Reveal Cards When All-In
+                  <small>Show hole cards automatically</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-reveal-allin" checked><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Deal to Away Players
+                  <small>Include sitting-out players in hands</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-deal-away"><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Auto-Trim Bets
+                  <small>Adjust raises to effective stack size</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-autotrim" checked><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Allow Spectators</span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-spectators" checked><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Guest Chat Enabled</span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-guest-chat" checked><span class="toggle-track"></span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="sset-section">
+              <div class="sset-title">Showdown Speed</div>
+              <div class="sset-row">
+                <span class="sset-label">Card Reveal Pace</span>
+                <div class="sset-control">
+                  <div class="radio-group">
+                    <button class="radio-opt" data-group="sdspeed" data-val="3"  onclick="radioSelect(this)">Fast</button>
+                    <button class="radio-opt active" data-group="sdspeed" data-val="6" onclick="radioSelect(this)">Normal</button>
+                    <button class="radio-opt" data-group="sdspeed" data-val="9"  onclick="radioSelect(this)">Slow</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /cols -->
+      </div><!-- /stab-game -->
+
+      <!-- ── Timing ────────────────────────────────────────────────── -->
+      <div class="sdlg-panel" id="stab-timing">
+        <div class="sdlg-cols">
+          <div>
+            <div class="sset-section">
+              <div class="sset-title">Decision Clock</div>
+              <div class="sset-row">
+                <span class="sset-label">Decision Time
+                  <small>Seconds per turn (0 = unlimited)</small>
+                </span>
+                <div class="sset-control">
+                  <input class="sset-num" type="number" id="s-decision-time" min="0" max="300" value="0">
+                  <span style="color:var(--muted);font-size:.8rem">sec</span>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Time Bank Length
+                  <small>Extra seconds available per refill</small>
+                </span>
+                <div class="sset-control">
+                  <input class="sset-num" type="number" id="s-timebank-len" min="0" value="30">
+                  <span style="color:var(--muted);font-size:.8rem">sec</span>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Time Bank Refill
+                  <small>Refill every N hands</small>
+                </span>
+                <div class="sset-control">
+                  <span style="color:var(--muted);font-size:.8rem">every</span>
+                  <input class="sset-num sset-num-sm" type="number" id="s-timebank-hands" min="0" value="10">
+                  <span style="color:var(--muted);font-size:.8rem">hands</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="sset-section">
+              <div class="sset-title">Auto-Start</div>
+              <div class="sset-row">
+                <span class="sset-label">Auto-Start Next Hand
+                  <small>Automatically deal after each hand ends</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="s-autostart"><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Delay Between Hands</span>
+                <div class="sset-control">
+                  <input class="sset-num" type="number" id="s-autostart-delay" min="1" max="60" value="5">
+                  <span style="color:var(--muted);font-size:.8rem">sec</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /stab-timing -->
+
+      <!-- ── Preferences (client-side) ────────────────────────────── -->
+      <div class="sdlg-panel" id="stab-prefs">
+        <div class="sdlg-cols">
+          <div>
+            <div class="sset-section">
+              <div class="sset-title">Visual</div>
+              <div class="sset-row">
+                <span class="sset-label">Deck Style</span>
+                <div class="sset-control">
+                  <div class="radio-group">
+                    <button class="radio-opt active" data-group="deck" data-val="2color" onclick="radioSelect(this)">2-Color</button>
+                    <button class="radio-opt"        data-group="deck" data-val="4color" onclick="radioSelect(this)">4-Color</button>
+                  </div>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Chip Display</span>
+                <div class="sset-control">
+                  <div class="radio-group">
+                    <button class="radio-opt active" data-group="dispmode" data-val="formatted" onclick="radioSelect(this)">$</button>
+                    <button class="radio-opt"        data-group="dispmode" data-val="bb"        onclick="radioSelect(this)">BB</button>
+                    <button class="radio-opt"        data-group="dispmode" data-val="none"      onclick="radioSelect(this)">Hide</button>
+                  </div>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Table Color</span>
+                <div class="sset-control">
+                  <div class="color-swatches">
+                    <div class="color-swatch selected" data-color="default" style="background:#1e6b44" title="Green" onclick="selectColor(this)"></div>
+                    <div class="color-swatch" data-color="blue"   style="background:#1e4a7a" title="Blue"   onclick="selectColor(this)"></div>
+                    <div class="color-swatch" data-color="red"    style="background:#5a1515" title="Red"    onclick="selectColor(this)"></div>
+                    <div class="color-swatch" data-color="purple" style="background:#3d1260" title="Purple" onclick="selectColor(this)"></div>
+                    <div class="color-swatch" data-color="black"  style="background:#2a2a2a" title="Black"  onclick="selectColor(this)"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="sset-section">
+              <div class="sset-title">Sound</div>
+              <div class="sset-row">
+                <span class="sset-label">All Sounds</span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="p-sound" checked><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Secondary Effects
+                  <small>Fold / Check / Bet sounds</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="p-secondary" checked><span class="toggle-track"></span></label>
+                </div>
+              </div>
+              <div class="sset-row">
+                <span class="sset-label">Chat Message Beep</span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="p-chatbeep"><span class="toggle-track"></span></label>
+                </div>
+              </div>
+            </div>
+            <div class="sset-section">
+              <div class="sset-title">Automation</div>
+              <div class="sset-row">
+                <span class="sset-label">Auto-Use Time Bank
+                  <small>Automatically activate when clock runs out</small>
+                </span>
+                <div class="sset-control">
+                  <label class="toggle"><input type="checkbox" id="p-autotb" checked><span class="toggle-track"></span></label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /stab-prefs -->
+
+      <!-- ── Players ───────────────────────────────────────────────── -->
+      <div class="sdlg-panel" id="stab-players">
+        <div id="players-table-wrap">
+          <table class="pl-table" id="players-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th>Seat</th>
+                <th>Stack</th>
+                <th>Time Bank</th>
+                <th>Status</th>
+                <th>Note</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="players-tbody"></tbody>
+          </table>
+        </div>
+      </div><!-- /stab-players -->
+
+    </div><!-- /sdlg-body -->
+
+    <div class="sdlg-footer">
+      <span class="note" id="sdlg-note"></span>
+      <button class="sfbtn" onclick="closeSettings()">Cancel</button>
+      <button class="sfbtn primary" onclick="applySettings()">Apply Changes</button>
+    </div>
+
+  </div><!-- /settings-dialog -->
+</div><!-- /settings-overlay -->
+
+<div id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/sounds.js"></script>
+<script src="/settings.js"></script>
+<script src="/game.js"></script>
+</body>
+</html>
