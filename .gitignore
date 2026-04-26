@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Downloaded tunnel binary (start.ps1 saves it here on first run)
+cloudflared.exe
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
