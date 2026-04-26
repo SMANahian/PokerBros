@@ -46,55 +46,88 @@ Self-hosted Texas Hold'em for you and your friends. Run it on your machine, shar
 - Sound effects via Web Audio API — no audio files required
 - Toggleable secondary sounds and chat beep
 
+---
+
 ## Quick Start
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) 18 or later
-- [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) for the tunnel (free, no account needed)
+The launcher script handles everything: it checks for Node.js, installs npm packages, downloads cloudflared if needed, starts the server, and opens a public tunnel — all in one step.
 
-Install cloudflared on macOS:
-```bash
-brew install cloudflared
+### Windows
+
+Double-click **`start.bat`**, or run in PowerShell:
+
+```powershell
+.\start.ps1
 ```
 
-### Run
+The script will:
+1. Install Node.js via **winget** if it isn't already installed
+2. Run `npm install` if `node_modules` is missing
+3. Download `cloudflared.exe` next to the script (one-time, ~35 MB) if cloudflared isn't in PATH
+4. Start the server and print the public URL
+
+> **First run only:** Windows may show a SmartScreen prompt for `start.bat` because it's a downloaded file.  
+> Click **More info → Run anyway** — the script only runs PowerShell.
+
+### macOS / Linux
+
 ```bash
-npm install
 ./start.sh
 ```
 
-`start.sh` starts the server on port 3000, then opens a cloudflared HTTPS tunnel. The public URL is printed in the terminal — share it with your friends.
+The script checks for Node.js, runs `npm install` if needed, and starts a cloudflared tunnel. If cloudflared isn't installed:
 
-If cloudflared isn't found, the script falls back to [localtunnel](https://github.com/localtunnel/localtunnel) (included as a dev dependency).
-
-### Development
 ```bash
-npm run dev   # nodemon — auto-restarts on file changes
+# macOS
+brew install cloudflared
+
+# Debian / Ubuntu
+curl -L https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install cloudflared
 ```
+
+If cloudflared is not found, the script falls back to [localtunnel](https://github.com/localtunnel/localtunnel) (included as a dev dependency).
+
+### Manual / Development
+
+```bash
+npm install
+npm start        # plain node
+npm run dev      # nodemon — auto-restarts on file changes
+```
+
+---
 
 ## How to Play
 
-1. Open the tunnel URL (or `http://localhost:3000` locally).
-2. Enter your name and click **Create Game** — you become the host.
-3. Share the room link (the **Copy Link** button copies it automatically).
+1. Run the launcher. The public URL is printed in the terminal.
+2. Open the URL (or `http://localhost:3000` locally), enter your name, click **Create Game** — you become the host.
+3. Share the room link with friends via the **Copy Link** button.
 4. Friends open the link, enter their names, and join.
-5. The host clicks **Deal Cards** to start the first hand.
+5. Host clicks **Deal Cards** to start.
 
-The host's **⚙ Settings** modal has three tabs:
+Press **Ctrl+C** in the terminal to stop the server and close the tunnel.
+
+### Settings modal (host)
 
 | Tab | What it controls |
 |---|---|
 | **Game Rules** | Blinds, antes, straddle, special rules, bomb pots, bounty, table management |
-| **Timing** | Decision clock, time bank, auto-start |
-| **Preferences** | Deck style, chip display, table color, sounds *(per client)* |
-| **Players** | Live player list with chip management and notes |
+| **Timing** | Decision clock, time bank, auto-start between hands |
+| **Preferences** | Deck style, chip display, table color, sounds *(saved per browser)* |
+| **Players** | Live player list with chip management, notes, kick, rename |
+
+---
 
 ## Project Structure
 
 ```
 .
 ├── server.js               # Express + Socket.io server
-├── start.sh                # Start server + cloudflared tunnel
+├── start.sh                # Launcher — macOS / Linux / WSL
+├── start.ps1               # Launcher — Windows (PowerShell)
+├── start.bat               # Launcher — Windows (double-click wrapper)
 ├── src/
 │   ├── Deck.js             # 52-card deck, Fisher-Yates shuffle
 │   ├── HandEvaluator.js    # Best 5-of-7 evaluation
