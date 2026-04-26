@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PokerBros</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: #0b0e14;
+      background-image:
+        radial-gradient(ellipse at 30% 60%, rgba(30,107,68,0.18) 0%, transparent 55%),
+        radial-gradient(ellipse at 70% 30%, rgba(42,51,71,0.4) 0%, transparent 50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+      color: #e8edf5;
+    }
+    .wrap { width: 100%; max-width: 420px; padding: 24px 20px; }
+
+    /* Logo */
+    .logo-area { text-align: center; margin-bottom: 36px; }
+    .suits { font-size: 1.6rem; letter-spacing: 4px; color: #4ecb82; margin-bottom: 10px; }
+    h1 {
+      font-size: 2.6rem;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      background: linear-gradient(135deg, #4ecb82 0%, #2e9e5f 60%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .tagline { color: #6b7a95; font-size: 0.9rem; margin-top: 4px; }
+
+    /* Cards */
+    .panel {
+      background: #12161f;
+      border: 1px solid #2a3347;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 12px;
+    }
+    .panel-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #6b7a95;
+      margin-bottom: 14px;
+    }
+    input {
+      width: 100%;
+      background: #0b0e14;
+      border: 1px solid #2a3347;
+      border-radius: 9px;
+      color: #e8edf5;
+      font-size: 0.95rem;
+      padding: 11px 14px;
+      margin-bottom: 10px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input:focus { border-color: #4ecb82; }
+    input::placeholder { color: #3a4560; }
+
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border-radius: 10px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+      letter-spacing: 0.2px;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:hover  { filter: brightness(1.1); }
+    .btn-green {
+      background: linear-gradient(135deg, #2e9e5f, #1e7a47);
+      color: #fff;
+    }
+    .btn-dark {
+      background: #1a2030;
+      color: #e8edf5;
+      border: 1px solid #2a3347;
+    }
+
+    .divider {
+      text-align: center;
+      color: #2a3347;
+      position: relative;
+      margin: 6px 0;
+      font-size: 0.78rem;
+      color: #3a4560;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 44%;
+      height: 1px;
+      background: #2a3347;
+    }
+    .divider::before { left: 0; }
+    .divider::after  { right: 0; }
+
+    .err { color: #e05555; font-size: 0.82rem; margin-top: 6px; min-height: 18px; }
+
+    /* Subtle card art in background */
+    .bg-cards {
+      position: fixed;
+      bottom: -20px;
+      right: -20px;
+      font-size: 8rem;
+      opacity: 0.03;
+      user-select: none;
+      pointer-events: none;
+      line-height: 1;
+    }
+  </style>
+</head>
+<body>
+<div class="bg-cards">♠♥<br>♦♣</div>
+<div class="wrap">
+  <div class="logo-area">
+    <div class="suits">♠ ♥ ♦ ♣</div>
+    <h1>PokerBros</h1>
+    <p class="tagline">Texas Hold'em with your crew</p>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">Create a Table</div>
+    <input id="createName" type="text" placeholder="Your name" maxlength="20" autocomplete="off">
+    <button class="btn btn-green" onclick="create()">Create Game</button>
+  </div>
+
+  <div class="divider">or join an existing game</div>
+
+  <div class="panel">
+    <div class="panel-title">Join a Table</div>
+    <input id="joinName" type="text" placeholder="Your name" maxlength="20" autocomplete="off">
+    <input id="roomCode" type="text" placeholder="Room code" maxlength="8"
+           style="text-transform:uppercase; font-weight:700; letter-spacing:2px" autocomplete="off">
+    <button class="btn btn-dark" onclick="join()">Join Game</button>
+    <div id="err" class="err"></div>
+  </div>
+</div>
+
+<script>
+  const saved = localStorage.getItem('pokerName');
+  if (saved) {
+    document.getElementById('createName').value = saved;
+    document.getElementById('joinName').value   = saved;
+  }
+  const rp = new URLSearchParams(location.search).get('r');
+  if (rp) document.getElementById('roomCode').value = rp.toUpperCase();
+
+  async function create() {
+    const name = document.getElementById('createName').value.trim();
+    if (!name) return alert('Enter your name');
+    localStorage.setItem('pokerName', name);
+    const res = await fetch('/api/new-room');
+    const { roomId } = await res.json();
+    location.href = `/game?r=${roomId}&name=${encodeURIComponent(name)}`;
+  }
+
+  function join() {
+    const name = document.getElementById('joinName').value.trim();
+    const code = document.getElementById('roomCode').value.trim().toUpperCase();
+    const err  = document.getElementById('err');
+    if (!name) { err.textContent = 'Enter your name'; return; }
+    if (!code || code.length < 6) { err.textContent = 'Enter a valid room code'; return; }
+    localStorage.setItem('pokerName', name);
+    location.href = `/game?r=${code}&name=${encodeURIComponent(name)}`;
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    if (document.activeElement.id.startsWith('join') ||
+        document.activeElement.id === 'roomCode') join();
+    else create();
+  });
+</script>
+</body>
+</html>
