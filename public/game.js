@@ -81,8 +81,11 @@ document.addEventListener('click', () => Sounds.resume(), { once: true });
 // ── Sound triggers ────────────────────────────────────────────────────────────
 function triggerSounds(prev, next) {
   if (!prev) return;
+  const prefs = typeof loadPrefs === 'function' ? loadPrefs() : {};
+  const secOk = prefs.secondarySounds !== false;
 
-  if (prev.state === 'WAITING' && next.state === 'PREFLOP') {
+  // New hand shuffle: WAITING → PREFLOP or WAITING → FLOP (bomb pot)
+  if (prev.state === 'WAITING' && (next.state === 'PREFLOP' || next.state === 'FLOP')) {
     Sounds.shuffle();
     return;
   }
@@ -99,11 +102,21 @@ function triggerSounds(prev, next) {
 
   if (next.state === 'SHOWDOWN' && prev.state !== 'SHOWDOWN') setTimeout(() => Sounds.win(), 300);
 
-  const potDiff = (next.pot || 0) - (prev.pot || 0);
-  if (potDiff > 0) {
-    const betDiff = (next.currentBet || 0) - (prev.currentBet || 0);
-    if (betDiff > 0) Sounds.chipRaise();
-    else             Sounds.chips(Math.min(Math.ceil(potDiff / 50), 5));
+  if (secOk) {
+    const potDiff = (next.pot || 0) - (prev.pot || 0);
+    if (potDiff > 0) {
+      const betDiff = (next.currentBet || 0) - (prev.currentBet || 0);
+      if (betDiff > 0) Sounds.chipRaise();
+      else             Sounds.chips(Math.min(Math.ceil(potDiff / 50), 5));
+    }
+
+    // Detect fold or check by action queue shrinking without pot growing
+    const prevQ = prev.actionQueue?.length || 0;
+    const nextQ = next.actionQueue?.length || 0;
+    if (nextQ < prevQ && potDiff <= 0) {
+      // Someone acted without putting chips in → check or fold
+      Sounds.check();
+    }
   }
 }
 
@@ -117,6 +130,7 @@ function render(s) {
   renderHostPanel(s);
   renderBombBanner(s);
   renderRabbitStrip(s);
+  updateSelfSitout(s);
   if (s.state === 'SHOWDOWN') maybeShowWinner(s);
   else                        hideWinner();
   if (s.timerStart && s.timerDuration) startTimerAnimation();
@@ -358,8 +372,34 @@ function renderActionBar(s) {
     rs.oninput = () => rv.value = rs.value;
   }
 
-  document.getElementById('action-info').textContent =
-    toCall > 0 ? `To call: ${formatChips(callAmt)}` : 'Your action';
+  // Pot odds
+  let infoHtml = toCall > 0 ? `To call: ${formatChips(callAmt)}` : 'Your action';
+  if (toCall > 0 && callAmt > 0) {
+    const odds = ((s.pot + callAmt) / callAmt).toFixed(1);
+    infoHtml += `  <span class="pot-odds">${odds}:1</span>`;
+  }
+  document.getElementById('action-info').innerHTML = infoHtml;
+
+  // Quick-bet button labels with amounts
+  _qbtn('qbtn-half', '½ Pot', me, s, 'half');
+  _qbtn('qbtn-pot',  'Pot',   me, s, 'pot');
+  _qbtn('qbtn-2x',   '2×',    me, s, '2x');
+  _qbtn('qbtn-max',  'Max',   me, s, 'max');
+}
+
+function _qbtn(id, label, me, s, type) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  const pot   = s.pot;
+  const maxTo = (me.bet || 0) + me.chips;
+  const cur   = s.currentBet;
+  let val;
+  if      (type === 'half') val = cur + Math.floor(pot / 2);
+  else if (type === 'pot')  val = cur + pot;
+  else if (type === '2x')   val = cur + pot * 2;
+  else                      val = maxTo;
+  val = Math.max(cur + s.minRaise, Math.min(val, maxTo));
+  btn.innerHTML = `<span class="qbtn-label">${label}</span><span class="qbtn-amt">${formatChips(val)}</span>`;
 }
 
 function quickRaise(type) {
@@ -398,15 +438,24 @@ function renderWaitingOverlay(s) {
 function maybeShowWinner(s) {
   if (winnerShown || !s.lastWinners?.length) return;
   winnerShown = true;
-  const w = s.lastWinners[0];
-  const p = s.players.find(pl => pl.id === w.playerId);
-  if (!p) return;
-  document.getElementById('wb-name').textContent = p.name;
-  document.getElementById('wb-hand').textContent = w.handName || '';
-  document.getElementById('wb-amt').textContent  = `+${formatChips(w.amount)}`;
+
+  const label = document.getElementById('wb-label');
+  label.textContent = s.lastWinners.length > 1 ? 'Winners' : 'Winner';
+
+  const list = document.getElementById('wb-list');
+  list.innerHTML = s.lastWinners.map(w => {
+    const p = s.players.find(pl => pl.id === w.playerId);
+    if (!p) return '';
+    return `<div class="wb-entry">
+      <div class="wb-name">${esc(p.name)}</div>
+      ${w.handName ? `<div class="wb-hand">${esc(w.handName)}</div>` : ''}
+      <div class="wb-amt">+${formatChips(w.amount)}</div>
+    </div>`;
+  }).join('');
+
   document.getElementById('winner-banner').classList.add('show');
   if (winnerTimer) clearTimeout(winnerTimer);
-  winnerTimer = setTimeout(hideWinner, 4500);
+  winnerTimer = setTimeout(hideWinner, 5000);
 }
 
 function hideWinner() {
@@ -540,6 +589,53 @@ function hostKick(targetId) {
 }
 
 function hostSitOut(targetId) { socket.emit('host_sit_out', { targetId }); }
+
+// ── Self sit-out ──────────────────────────────────────────────────────────────
+function toggleSelfSitOut() {
+  Sounds.resume();
+  socket.emit('player_sit_out');
+}
+
+function updateSelfSitout(s) {
+  const btn = document.getElementById('self-sitout-btn');
+  if (!btn) return;
+  const me = s.players.find(p => p.id === myId);
+  if (!me) { btn.style.display = 'none'; return; }
+  const isOut = me.status === 'sitting-out';
+  btn.style.display = '';
+  btn.textContent = isOut ? 'Sit In' : 'Sit Out';
+  btn.classList.toggle('active', isOut);
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (!state) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+  const myTurn = state.currentPlayerId === myId &&
+    ['PREFLOP','FLOP','TURN','RIVER'].includes(state.state);
+
+  switch (e.key.toLowerCase()) {
+    case 'f': if (myTurn) act('fold');  break;
+    case 'c':
+    case ' ':
+      e.preventDefault();
+      if (myTurn) {
+        const toCall = Math.max(0, state.currentBet - (state.players.find(p=>p.id===myId)?.bet||0));
+        act(toCall <= 0 ? 'check' : 'call');
+      }
+      break;
+    case 'a': if (myTurn) act('allin'); break;
+    case 'r':
+      if (myTurn) document.getElementById('raise-val')?.focus();
+      break;
+    case '1': if (myTurn) quickRaise('half'); break;
+    case '2': if (myTurn) quickRaise('pot');  break;
+    case '3': if (myTurn) quickRaise('2x');   break;
+    case '4': if (myTurn) quickRaise('max');  break;
+  }
+});
 
 // ── Mute ──────────────────────────────────────────────────────────────────────
 function toggleMute() {

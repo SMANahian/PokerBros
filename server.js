@@ -302,6 +302,15 @@ io.on('connection', socket => {
     broadcastState(roomId, game);
   });
 
+  // ── Self: sit-out toggle (any player) ─────────────────────────────────────
+  socket.on('player_sit_out', () => {
+    const { roomId } = socket.data;
+    const game = rooms.get(roomId);
+    if (!game) return;
+    game.hostToggleSitOut(socket.id);
+    afterAction(roomId, game);
+  });
+
   socket.on('host_bomb_pot_next', () => {
     const { roomId } = socket.data;
     const game = rooms.get(roomId);

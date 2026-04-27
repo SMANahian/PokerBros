@@ -47,7 +47,7 @@
     </div>
 
     <!-- Waiting overlay -->
-    <div id="waiting-overlay">
+    <div id="waiting-overlay" class="hidden">
       <h2 id="waiting-title">Waiting for players…</h2>
       <p id="waiting-sub"></p>
       <button id="start-game-btn" onclick="emitStart()">Deal Cards</button>
@@ -55,11 +55,12 @@
 
     <!-- Winner banner -->
     <div id="winner-banner">
-      <div class="wb-label">Winner</div>
-      <div class="wb-name" id="wb-name"></div>
-      <div class="wb-hand" id="wb-hand"></div>
-      <div class="wb-amt"  id="wb-amt"></div>
+      <div class="wb-label" id="wb-label">Winner</div>
+      <div id="wb-list"></div>
     </div>
+
+    <!-- Sit-out button (always visible when in game) -->
+    <button id="self-sitout-btn" class="self-sitout-btn" onclick="toggleSelfSitOut()" style="display:none">Sit Out</button>
 
     <!-- Action bar -->
     <div id="action-area" class="hidden">
@@ -73,10 +74,10 @@
         <button class="act-btn btn-raise" onclick="act('raise')">Raise</button>
       </div>
       <div class="quick-btns">
-        <button class="qbtn" onclick="quickRaise('half')">½ Pot</button>
-        <button class="qbtn" onclick="quickRaise('pot')">Pot</button>
-        <button class="qbtn" onclick="quickRaise('2x')">2×</button>
-        <button class="qbtn" onclick="quickRaise('max')">Max</button>
+        <button class="qbtn" id="qbtn-half" onclick="quickRaise('half')">½ Pot</button>
+        <button class="qbtn" id="qbtn-pot"  onclick="quickRaise('pot')">Pot</button>
+        <button class="qbtn" id="qbtn-2x"   onclick="quickRaise('2x')">2×</button>
+        <button class="qbtn" id="qbtn-max"  onclick="quickRaise('max')">Max</button>
       </div>
       <button class="act-btn btn-allin" onclick="act('allin')">All-In</button>
     </div>
